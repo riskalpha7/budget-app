@@ -8,6 +8,8 @@ app.use(express.json())
 // This is your webhook endpoint — the web address you give to Salt Edge
 // Salt Edge will call this URL every time a new transaction appears
 app.post('/webhook', (req, res) => {
+  console.log('Raw data received:', JSON.stringify(req.body, null, 2))
+  res.status(200).json({ status: 'received' })
 
   // req.body contains the transaction data Salt Edge sent
   const transaction = req.body.data
