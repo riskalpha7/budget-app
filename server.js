@@ -1,18 +1,15 @@
 const express = require('express')
+const axios = require('axios')
 const app = express()
 
 app.use(express.json())
 
-// In-memory store for transactions
 let transactions = []
+let monthlyBudget = 3600
 
-// Salt Edge calls this when new transactions appear
 app.post('/webhook', async (req, res) => {
   console.log('Webhook received:', req.body.data.stage)
-
   if (req.body.data.stage === 'finish_fetching') {
-    const axios = require('axios')
-    
     try {
       const response = await axios.get(
         'https://www.saltedge.com/api/v6/transactions',
@@ -21,42 +18,50 @@ app.post('/webhook', async (req, res) => {
             'App-id': 'K6jQACaikG5tzfkwv2H76tluFXAl2Xja1U-9Se7HKno',
             'Secret': 'AOTJWIXd6MIsazBfja2xkYBDJvqBHOTOVtSSQRDBbIA',
           },
-          params: {
-            connection_id: '1806851670357841964'
-          }
+          params: { connection_id: '1806851670357841964' }
         }
       )
-
-      const fetched = response.data.data
-      console.log('Transactions fetched:', fetched.length)
-
-      // Store them
-      transactions = fetched.map(tx => ({
+      transactions = response.data.data.map(tx => ({
         id: tx.id,
         description: tx.description,
         amount: tx.amount,
         category: tx.category,
         made_on: tx.made_on
       }))
-
+      console.log('Transactions fetched:', transactions.length)
     } catch (error) {
-      console.log('Error fetching transactions:', error.message)
+      console.log('Error:', error.message)
     }
   }
-
   res.status(200).json({ status: 'received' })
 })
 
-// Your iPhone app calls this to get transactions
+// Get transactions
 app.get('/transactions', (req, res) => {
   res.json(transactions)
 })
 
-// Health check
+// Get budget
+app.get('/budget', (req, res) => {
+  res.json({ monthlyBudget })
+})
+
+// Update budget
+app.post('/budget', (req, res) => {
+  const { budget } = req.body
+  if (budget && budget > 0) {
+    monthlyBudget = budget
+    console.log('Budget updated to:', monthlyBudget)
+    res.json({ monthlyBudget })
+  } else {
+    res.status(400).json({ error: 'Invalid budget' })
+  }
+})
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'running' })
 })
 
 app.listen(3000, () => {
-  console.log('Budget backend is running on port 3000')
+  console.log('Budget backend running on port 3000')
 })
