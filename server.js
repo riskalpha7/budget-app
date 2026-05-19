@@ -7,6 +7,7 @@ app.use(express.json())
 let transactions = []
 let monthlyBudget = 3600
 
+// Salt Edge webhook
 app.post('/webhook', async (req, res) => {
   console.log('Webhook received:', req.body.data.stage)
   if (req.body.data.stage === 'finish_fetching') {
@@ -15,8 +16,8 @@ app.post('/webhook', async (req, res) => {
         'https://www.saltedge.com/api/v6/transactions',
         {
           headers: {
-            'App-id': 'K6jQACaikG5tzfkwv2H76tluFXAl2Xja1U-9Se7HKno',
-            'Secret': 'AOTJWIXd6MIsazBfja2xkYBDJvqBHOTOVtSSQRDBbIA',
+            'App-id': 'YOUR_APP_ID_HERE',
+            'Secret': 'YOUR_SECRET_HERE',
           },
           params: { connection_id: '1806851670357841964' }
         }
@@ -34,6 +35,43 @@ app.post('/webhook', async (req, res) => {
     }
   }
   res.status(200).json({ status: 'received' })
+})
+
+// Manual transaction from Make.com Gmail automation
+app.post('/add-transaction', (req, res) => {
+  const { amount, description, account } = req.body
+
+  let parsedAmount = null
+
+  // If amount is a raw email snippet, extract the CHF amount
+  if (typeof amount === 'string' && amount.includes('debited CHF')) {
+    const match = amount.match(/debited CHF ([\d.]+)/)
+    if (match) {
+      parsedAmount = parseFloat(match[1])
+    }
+  } else {
+    parsedAmount = parseFloat(amount)
+  }
+
+  if (!parsedAmount || isNaN(parsedAmount)) {
+    console.log('Could not parse amount from:', amount)
+    return res.status(400).json({ error: 'Could not parse amount' })
+  }
+
+  const today = new Date()
+  const made_on = today.toISOString().split('T')[0]
+
+  const transaction = {
+    id: 'ubs_' + Date.now(),
+    description: description || 'UBS Transaction',
+    amount: -Math.abs(parsedAmount),
+    category: null,
+    made_on: made_on
+  }
+
+  transactions.unshift(transaction)
+  console.log('UBS transaction added:', transaction)
+  res.status(200).json({ status: 'added', transaction })
 })
 
 // Get transactions
